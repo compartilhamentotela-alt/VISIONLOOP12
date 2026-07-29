@@ -1,0 +1,1380 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VisionLoop — Controlador</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f0f0f;
+    --surface: #1a1a1a;
+    --surface2: #242424;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.14);
+    --text: #f0f0f0;
+    --muted: #888;
+    --accent: #6c63ff;
+    --accent-dim: rgba(108,99,255,0.15);
+    --green: #22c55e;
+    --red: #ef4444;
+    --amber: #f59e0b;
+    --radius: 10px;
+    --radius-lg: 14px;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 28px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .logo {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 17px; font-weight: 600; letter-spacing: -0.3px;
+  }
+  .logo-icon {
+    width: 32px; height: 32px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden; flex-shrink: 0;
+  }
+  .logo-icon img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--red); display: inline-block;
+    margin-right: 6px; transition: background 0.3s;
+  }
+  .status-dot.ok { background: var(--green); }
+  .status-bar { display: flex; align-items: center; font-size: 12px; color: var(--muted); gap: 4px; }
+
+  main {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 0;
+    height: calc(100vh - 61px);
+  }
+
+  .sidebar {
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+
+  .sidebar-header {
+    padding: 20px;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.8px;
+    color: var(--muted);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+
+  .tv-count {
+    background: var(--accent-dim); color: var(--accent);
+    border-radius: 20px; padding: 1px 8px;
+    font-size: 11px; font-weight: 700;
+  }
+
+  .tv-list { flex: 1; overflow-y: auto; padding: 10px; }
+
+  .tv-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px; margin-bottom: 8px;
+    cursor: pointer; transition: border-color 0.15s, background 0.15s;
+  }
+  .tv-card:hover { border-color: var(--border2); background: var(--surface2); }
+  .tv-card.selected { border-color: var(--accent); background: var(--accent-dim); }
+
+  .tv-card-top { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .tv-icon {
+    width: 36px; height: 36px; background: var(--surface2);
+    border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+  }
+  .tv-card.selected .tv-icon { background: rgba(108,99,255,0.25); }
+  .tv-name { font-weight: 600; font-size: 13px; }
+  .tv-code-badge { font-family: monospace; font-size: 11px; color: var(--muted); }
+  .tv-status { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
+
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
+  .dot.playing { background: var(--green); }
+  .dot.paused { background: var(--amber); }
+
+  .empty-tvs { padding: 40px 20px; text-align: center; color: var(--muted); }
+  .empty-tvs .icon { font-size: 36px; margin-bottom: 10px; }
+  .empty-tvs p { font-size: 12px; line-height: 1.7; }
+
+  .content { display: flex; flex-direction: column; overflow: hidden; }
+
+  .content-header {
+    padding: 20px 28px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .content-title { font-size: 16px; font-weight: 600; }
+  .content-subtitle { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 14px; border-radius: 8px; border: none;
+    cursor: pointer; font-size: 13px; font-weight: 500;
+    transition: opacity 0.15s, transform 0.1s;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn:active { transform: scale(0.97); }
+  .btn-accent { background: var(--accent); color: #fff; }
+  .btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-red { background: rgba(239,68,68,0.15); color: var(--red); border: 1px solid rgba(239,68,68,0.25); }
+  .btn-green { background: rgba(34,197,94,0.15); color: var(--green); border: 1px solid rgba(34,197,94,0.25); }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .panel { flex: 1; overflow-y: auto; padding: 24px 28px; }
+
+  .section-label {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.8px; color: var(--muted); margin-bottom: 12px;
+  }
+
+  .video-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px; margin-bottom: 28px;
+  }
+  .scrollable-grid { max-height: 420px; overflow-y: auto; padding-right: 4px; }
+
+  .video-item {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px; cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    display: flex; flex-direction: column; gap: 8px;
+    position: relative;
+  }
+  .video-item:hover { border-color: var(--border2); background: var(--surface2); }
+  .video-item.selected { border-color: var(--accent); background: var(--accent-dim); }
+
+  .video-delete-btn {
+    position: absolute; top: 8px; right: 8px; z-index: 2;
+    width: 24px; height: 24px; border-radius: 6px; border: none;
+    background: rgba(0,0,0,0.55); color: #fff; font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; opacity: 0; transition: opacity 0.15s, background 0.15s;
+  }
+  .video-item:hover .video-delete-btn { opacity: 1; }
+  .video-delete-btn:hover { background: var(--red, #e5484d); }
+
+  .video-thumb {
+    aspect-ratio: 16/9; background: var(--surface2); border-radius: 6px;
+    display: flex; align-items: center; justify-content: center; font-size: 24px;
+    background-size: cover; background-position: center;
+  }
+  .video-name {
+    font-size: 12px; font-weight: 500;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  .controls-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 28px; }
+
+  .broadcast-section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 20px; margin-bottom: 28px;
+  }
+  .broadcast-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .broadcast-sub { font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+
+  .no-selection {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    color: var(--muted); gap: 12px; padding: 40px;
+    text-align: center; overflow-y: auto;
+  }
+  .no-selection .icon { font-size: 48px; opacity: 0.4; }
+  .no-selection h3 { font-size: 16px; color: var(--text); font-weight: 500; }
+  .no-selection p { font-size: 13px; }
+
+  .tv-detail-header { display: flex; align-items: center; gap: 14px; }
+  .tv-detail-icon {
+    width: 44px; height: 44px; background: var(--accent-dim);
+    border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 22px;
+  }
+
+  .refresh-btn {
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    font-size: 14px; padding: 4px; display: flex; align-items: center; transition: color 0.15s;
+  }
+  .refresh-btn:hover { color: var(--text); }
+
+  .tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600;
+  }
+  .tag-green { background: rgba(34,197,94,0.15); color: var(--green); }
+  .tag-amber { background: rgba(245,158,11,0.15); color: var(--amber); }
+  .tag-muted { background: var(--surface2); color: var(--muted); }
+  .tag-red { background: rgba(239,68,68,0.15); color: var(--red); }
+
+  .divider { height: 1px; background: var(--border); margin: 20px 0; }
+
+  .now-playing {
+    background: var(--surface2); border-radius: 8px; padding: 10px 14px;
+    margin-bottom: 16px; display: flex; align-items: center; gap: 10px; font-size: 13px;
+  }
+  .now-playing .label { color: var(--muted); font-size: 11px; margin-bottom: 2px; }
+  .now-playing .filename { font-weight: 500; }
+
+  .dropzone {
+    border: 2px dashed var(--border2); border-radius: var(--radius-lg);
+    padding: 18px; text-align: center; cursor: pointer; margin-bottom: 14px;
+    color: var(--muted); transition: border-color 0.15s, background 0.15s, color 0.15s;
+  }
+  .dropzone:hover, .dropzone.dragover {
+    border-color: var(--accent); background: var(--accent-dim); color: var(--text);
+  }
+  .dropzone-icon { font-size: 20px; margin-bottom: 4px; }
+  .dropzone-text { font-size: 13px; }
+  .dropzone-link { color: var(--accent); font-weight: 600; text-decoration: underline; }
+  .dropzone-hint { font-size: 11px; margin-top: 4px; opacity: 0.7; }
+
+  .upload-list { margin-bottom: 4px; }
+  .upload-item {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 9px 12px; margin-bottom: 8px; font-size: 12px;
+  }
+  .upload-item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .upload-bar-track { width: 80px; height: 5px; background: var(--surface2); border-radius: 4px; overflow: hidden; flex-shrink: 0; }
+  .upload-bar-fill { height: 100%; background: var(--accent); width: 0%; transition: width 0.15s; }
+  .upload-pct { width: 36px; text-align: right; color: var(--muted); flex-shrink: 0; }
+  .upload-item.done .upload-bar-fill { background: var(--green); }
+  .upload-item.done .upload-pct { color: var(--green); }
+  .upload-item.error .upload-bar-fill { background: var(--red); }
+  .upload-item.error .upload-pct { color: var(--red); }
+
+  /* ===== TABS ===== */
+  .tabs {
+    display: flex; gap: 0;
+    border-bottom: 1px solid var(--border);
+    padding: 0 28px;
+    background: var(--surface);
+  }
+  .tab-btn {
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    font-size: 13px; font-weight: 500; padding: 14px 16px;
+    border-bottom: 2px solid transparent; transition: color 0.15s, border-color 0.15s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* ===== PLAYLISTS ===== */
+  .playlist-manager {
+    display: flex; flex-direction: column; height: 100%; overflow: hidden;
+  }
+  .playlist-header {
+    padding: 20px 28px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .playlist-body {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    flex: 1; overflow: hidden;
+  }
+  .pl-list-col {
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .pl-list-col-header {
+    padding: 14px 16px;
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.7px; color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .pl-list { flex: 1; overflow-y: auto; padding: 8px; }
+
+  .pl-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 12px 14px; margin-bottom: 6px;
+    cursor: pointer; transition: border-color 0.15s, background 0.15s;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .pl-card:hover { border-color: var(--border2); background: var(--surface2); }
+  .pl-card.selected { border-color: var(--accent); background: var(--accent-dim); }
+  .pl-card-icon { font-size: 20px; flex-shrink: 0; }
+  .pl-card-info { flex: 1; min-width: 0; }
+  .pl-card-name { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pl-card-count { font-size: 11px; color: var(--muted); }
+  .pl-card-del {
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    font-size: 16px; padding: 2px 6px; border-radius: 4px; transition: color 0.15s, background 0.15s;
+    flex-shrink: 0;
+  }
+  .pl-card-del:hover { color: var(--red); background: rgba(239,68,68,0.1); }
+
+  .pl-edit-col { display: flex; flex-direction: column; overflow: hidden; }
+  .pl-edit-inner { flex: 1; overflow-y: auto; padding: 20px 24px; }
+
+  .pl-empty-state {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    height: 100%; gap: 12px; color: var(--muted); text-align: center; padding: 40px;
+  }
+  .pl-empty-state .icon { font-size: 40px; opacity: 0.4; }
+  .pl-empty-state h3 { font-size: 15px; color: var(--text); font-weight: 500; }
+  .pl-empty-state p { font-size: 12px; }
+
+  /* Formulário nova playlist */
+  .pl-form { display: flex; flex-direction: column; gap: 0; }
+
+  .form-row { margin-bottom: 20px; }
+  .form-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.7px; color: var(--muted); margin-bottom: 8px; }
+  .form-input {
+    width: 100%; background: var(--surface); border: 1px solid var(--border2);
+    border-radius: 8px; color: var(--text); font-size: 14px;
+    padding: 10px 14px; outline: none; transition: border-color 0.2s;
+  }
+  .form-input:focus { border-color: var(--accent); }
+  .form-input.error { border-color: var(--red); }
+  .form-hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .form-error { font-size: 11px; color: var(--red); margin-top: 4px; min-height: 16px; }
+
+  /* Grade de seleção de vídeos para playlist */
+  .pl-video-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 8px; margin-bottom: 8px;
+  }
+  .pl-video-item {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 10px; cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    display: flex; flex-direction: column; gap: 6px; position: relative;
+  }
+  .pl-video-item:hover { border-color: var(--border2); background: var(--surface2); }
+  .pl-video-item.selected { border-color: var(--accent); background: var(--accent-dim); }
+  .pl-video-item .check {
+    position: absolute; top: 6px; right: 6px;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--accent); color: #fff;
+    font-size: 10px; font-weight: 700;
+    display: none; align-items: center; justify-content: center;
+  }
+  .pl-video-item.selected .check { display: flex; }
+  .pl-video-thumb {
+    aspect-ratio: 16/9; background: var(--surface2); border-radius: 5px;
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
+  }
+  .pl-video-name { font-size: 11px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Lista ordenada de vídeos na playlist */
+  .pl-order-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+  .pl-order-item {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 12px;
+    display: flex; align-items: center; gap: 10px; font-size: 13px;
+  }
+  .pl-order-num {
+    font-size: 11px; font-weight: 700; color: var(--accent);
+    width: 20px; text-align: center; flex-shrink: 0;
+  }
+  .pl-order-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pl-order-btns { display: flex; gap: 4px; flex-shrink: 0; }
+  .pl-order-btn {
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    cursor: pointer; border-radius: 5px; padding: 2px 7px; font-size: 13px;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .pl-order-btn:hover { color: var(--text); border-color: var(--border2); }
+  .pl-order-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .pl-order-del {
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    font-size: 15px; padding: 2px 6px; border-radius: 4px; transition: color 0.15s;
+  }
+  .pl-order-del:hover { color: var(--red); }
+
+  /* Seção de envio de playlist para TV */
+  .pl-send-section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 16px 20px;
+  }
+  .pl-send-title { font-size: 13px; font-weight: 600; margin-bottom: 10px; }
+  .pl-send-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .pl-tv-select {
+    background: var(--surface2); border: 1px solid var(--border2); border-radius: 8px;
+    color: var(--text); font-size: 13px; padding: 8px 12px; outline: none; flex: 1; min-width: 0;
+    cursor: pointer;
+  }
+  .pl-tv-select:focus { border-color: var(--accent); }
+
+  .pl-info-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(108,99,255,0.1); border: 1px solid rgba(108,99,255,0.25);
+    border-radius: 8px; padding: 8px 14px; font-size: 12px; color: var(--accent);
+    margin-bottom: 16px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon"><img src="/assets/logo.png" alt="VisionLoop"></div>
+    VisionLoop
+  </div>
+  <div style="display:flex; align-items:center; gap:16px;">
+    <div id="roomCodeDisplay" style="font-size:13px; color:var(--green); font-family:monospace; font-weight:700; letter-spacing:3px; display:none; align-items:center; gap:6px;">
+      🔑 Código: <span id="roomCodeValue"></span>
+    </div>
+    <div class="status-bar">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusText">Conectando...</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      TVs conectadas
+      <span class="tv-count" id="tvCount">0</span>
+    </div>
+    <div class="tv-list" id="tvList">
+      <div class="empty-tvs">
+        <div class="icon">📺</div>
+        <p>Nenhuma TV conectada.<br>Abra <strong>tv.html</strong> em cada TV para conectar.</p>
+      </div>
+    </div>
+  </aside>
+
+  <section class="content">
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" id="tab-videos" onclick="switchTab('videos')">🎬 Vídeos</button>
+      <button class="tab-btn" id="tab-playlists" onclick="switchTab('playlists')">📋 Playlists</button>
+    </div>
+
+    <!-- ===== TAB VÍDEOS ===== -->
+    <div id="panel-videos" style="display:flex; flex-direction:column; flex:1; overflow:hidden;">
+
+      <div id="noSelection" class="no-selection">
+        <div class="icon">🎬</div>
+        <h3>Selecione uma TV</h3>
+        <p>Clique em uma TV no painel esquerdo para controlar ou use o painel de transmissão abaixo.</p>
+        <div style="margin-top:20px; width:100%; max-width:900px;">
+          <div class="broadcast-section">
+            <div style="display:flex; align-items:center; justify-content:space-between;">
+              <div>
+                <div class="broadcast-title">📡 Transmitir para todas</div>
+                <div class="broadcast-sub">Envie o mesmo vídeo para todas as TVs conectadas de uma vez.</div>
+              </div>
+              <button class="refresh-btn" onclick="loadVideos()">↻ atualizar</button>
+            </div>
+            <div class="dropzone" id="dropzone-broadcast">
+            <input type="file" id="fileInput-broadcast" accept="video/*,image/*,.mp4,.webm,.mkv,.mov,.avi,.jpg,.jpeg,.png,.gif,.webp" multiple style="display:none">
+            <div class="dropzone-icon">⬆</div>
+            <div class="dropzone-text">Arraste vídeos aqui ou <span class="dropzone-link">clique para selecionar</span></div>
+            <div class="dropzone-hint">.mp4 · .webm · .mkv · .mov · .avi · .jpg · .png</div>
+            </div>
+            <div class="upload-list" id="uploadList-broadcast"></div>
+            <div id="broadcastVideoList" class="video-grid scrollable-grid" style="margin-bottom:12px;"></div>
+            <button class="btn btn-accent" onclick="broadcastSelected()" id="broadcastBtn" disabled>
+              📡 Transmitir para todas as TVs
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="tvPanel" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
+        <div class="content-header">
+          <div>
+            <div class="tv-detail-header">
+              <div class="tv-detail-icon">📺</div>
+              <div>
+                <div class="content-title" id="panelTvName">TV</div>
+                <div class="content-subtitle">
+                  Código: <code id="panelTvCode" style="font-family:monospace; color:var(--accent);"></code>
+                  &nbsp;·&nbsp;
+                  <span id="panelTvStatus"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <button class="btn btn-ghost btn-sm" onclick="deselectTv()">← Voltar</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div id="nowPlayingBar" style="display:none;" class="now-playing">
+            <span>▶</span>
+            <div>
+              <div class="label" id="nowPlayingLabel">Reproduzindo agora</div>
+              <div class="filename" id="nowPlayingName"></div>
+            </div>
+          </div>
+
+          <div class="section-label">Controles</div>
+          <div class="controls-row" id="controlsRow">
+            <button class="btn btn-green" onclick="resumeTv()" id="btnResume" disabled>▶ Retomar</button>
+            <button class="btn btn-ghost" onclick="pauseTv()" id="btnPause" disabled>⏸ Pausar</button>
+            <button class="btn btn-red btn-sm" onclick="stopTv()" id="btnStop" disabled>⏹ Parar</button>
+            <button class="btn btn-ghost btn-sm" onclick="toggleFullscreen()" id="btnFullscreen" disabled title="Tela cheia na TV">⛶ Tela cheia</button>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="section-label" style="display:flex; align-items:center; justify-content:space-between;">
+            Vídeos disponíveis
+            <button class="refresh-btn" onclick="loadVideos()">↻ atualizar</button>
+          </div>
+
+          <div class="dropzone" id="dropzone-panel">
+            <input type="file" id="fileInput-panel" accept="video/*,image/*,.mp4,.webm,.mkv,.mov,.avi,.jpg,.jpeg,.png,.gif,.webp" multiple style="display:none">
+            <div class="dropzone-icon">⬆</div>
+            <div class="dropzone-text">Arraste vídeos aqui ou <span class="dropzone-link">clique para selecionar</span></div>
+            <div class="dropzone-hint">.mp4 · .webm · .mkv · .mov · .avi · .jpg · .png</div>
+          </div>
+          <div class="upload-list" id="uploadList-panel"></div>
+
+          <div class="video-grid scrollable-grid" id="videoGrid">
+            <div style="color:var(--muted); font-size:12px; grid-column:1/-1;">Carregando vídeos...</div>
+          </div>
+
+          <div class="divider"></div>
+          <div class="section-label">Transmissão em massa</div>
+          <div class="broadcast-section">
+            <div class="broadcast-sub">Envie o vídeo selecionado acima para todas as TVs conectadas simultaneamente.</div>
+            <button class="btn btn-accent" onclick="broadcastCurrent()" id="btnBroadcastAll">
+              📡 Transmitir para todas as TVs
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== TAB PLAYLISTS ===== -->
+    <div id="panel-playlists" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
+      <div class="playlist-manager">
+        <div class="playlist-header">
+          <div>
+            <div class="content-title">📋 Playlists</div>
+            <div class="content-subtitle">Crie e gerencie playlists em loop para suas TVs</div>
+          </div>
+          <button class="btn btn-accent" onclick="openNewPlaylist()">+ Nova Playlist</button>
+        </div>
+        <div class="playlist-body">
+          <!-- Coluna esquerda: lista de playlists -->
+          <div class="pl-list-col">
+            <div class="pl-list-col-header">
+              Minhas Playlists
+              <span class="tv-count" id="plCount">0</span>
+            </div>
+            <div class="pl-list" id="plList">
+              <div class="empty-tvs" style="padding:30px 16px;">
+                <div class="icon">📋</div>
+                <p>Nenhuma playlist.<br>Clique em <strong>+ Nova Playlist</strong> para criar.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Coluna direita: edição / visualização -->
+          <div class="pl-edit-col">
+            <!-- Estado vazio -->
+            <div class="pl-empty-state" id="plEmptyState">
+              <div class="icon">🎬</div>
+              <h3>Selecione uma playlist</h3>
+              <p>Escolha uma playlist à esquerda ou crie uma nova.</p>
+            </div>
+
+            <!-- Formulário de criação/edição -->
+            <div id="plForm" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
+              <div style="padding:16px 24px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; flex-shrink:0;">
+                <div class="content-title" id="plFormTitle">Nova Playlist</div>
+                <div style="display:flex; gap:8px;">
+                  <button class="btn btn-ghost btn-sm" onclick="cancelPlaylistEdit()">Cancelar</button>
+                  <button class="btn btn-accent btn-sm" onclick="savePlaylist()" id="plSaveBtn">Salvar</button>
+                </div>
+              </div>
+              <div class="pl-edit-inner">
+                <div class="form-row">
+                  <div class="form-label">Nome da Playlist *</div>
+                  <input type="text" class="form-input" id="plNameInput" placeholder="Ex: Promoções, Cardápio, Destaques..." maxlength="60">
+                  <div class="form-error" id="plNameError"></div>
+                </div>
+
+                <div class="form-row">
+                  <div class="form-label" style="margin-bottom:8px;">Vídeos disponíveis — clique para adicionar</div>
+                  <div class="pl-video-grid" id="plVideoGrid">
+                    <div style="color:var(--muted);font-size:12px;grid-column:1/-1;">Carregando vídeos...</div>
+                  </div>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="form-row">
+                  <div class="form-label" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                    <span>Ordem de reprodução</span>
+                    <span id="plOrderCount" style="font-size:11px; color:var(--muted); text-transform:none; letter-spacing:0;">0 vídeo(s)</span>
+                  </div>
+                  <div class="form-error" id="plVideosError"></div>
+                  <div id="plOrderList" class="pl-order-list"></div>
+                  <div id="plOrderEmpty" style="color:var(--muted); font-size:12px; padding:12px 0;">
+                    Nenhum vídeo adicionado. Clique nos vídeos acima para incluí-los.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Visualização de playlist existente -->
+            <div id="plView" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
+              <div style="padding:16px 24px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; flex-shrink:0;">
+                <div>
+                  <div class="content-title" id="plViewName"></div>
+                  <div class="content-subtitle" id="plViewCount"></div>
+                </div>
+                <div style="display:flex; gap:8px;">
+                  <button class="btn btn-ghost btn-sm" onclick="editPlaylist()">✏️ Editar</button>
+                </div>
+              </div>
+              <div class="pl-edit-inner">
+                <div class="pl-info-badge">
+                  🔁 Esta playlist será reproduzida em loop contínuo na TV selecionada
+                </div>
+
+                <div class="section-label">Vídeos na ordem de reprodução</div>
+                <div id="plViewOrderList" class="pl-order-list" style="margin-bottom:20px;"></div>
+
+                <div class="divider"></div>
+
+                <div class="section-label">Enviar para TV</div>
+                <div class="pl-send-section">
+                  <div class="pl-send-title">Escolha a TV e inicie a playlist em loop</div>
+                  <div class="pl-send-row">
+                    <select class="pl-tv-select" id="plTvSelect">
+                      <option value="">— Selecione uma TV —</option>
+                    </select>
+                    <button class="btn btn-accent" onclick="sendPlaylistToTv()" id="plSendBtn" disabled>
+                      ▶ Iniciar Playlist
+                    </button>
+                  </div>
+                  <div style="margin-top:10px;">
+                    <button class="btn btn-ghost btn-sm" onclick="broadcastPlaylist()" id="plBroadcastBtn">
+                      📡 Enviar para todas as TVs
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </section>
+</main>
+
+<script>
+// ==================== STATE ====================
+let ws;
+let tvs = [];
+let selectedTvCode = null;
+let selectedVideo = null;
+let broadcastVideo = null;
+let videos = [];
+let playlists = {};
+let selectedPlaylistId = null;
+let editingPlaylistId = null;    // null = nova playlist
+let plSelectedVideos = [];       // vídeos escolhidos no form (em ordem)
+let plSelectedDurations = {};    // duração (em segundos) para cada item da playlist
+
+// ==================== WebSocket ====================
+function connect() {
+  const serverAddr = location.host || "localhost:3000";
+  const wsProtocol = location.protocol === "https:" ? "wss:" : "ws:";
+  ws = new WebSocket(`${wsProtocol}//${serverAddr}`);
+  ws.onopen = () => {
+    setStatus(true);
+    ws.send(JSON.stringify({ type: 'controller_connect' }));
+    loadVideos();
+    loadPlaylists();
+  };
+  ws.onclose = () => { setStatus(false); setTimeout(connect, 2000); };
+  ws.onerror = (err) => console.error("WebSocket Error:", err);
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === 'your_room_code') {
+      document.getElementById('roomCodeValue').textContent = msg.code;
+      document.getElementById('roomCodeDisplay').style.display = 'flex';
+    }
+    if (msg.type === 'tv_list') {
+      const fsMap = {};
+      tvs.forEach(t => { if (t.fullscreen) fsMap[t.code] = true; });
+      tvs = msg.tvs.map(t => ({ ...t, fullscreen: !!fsMap[t.code] }));
+      renderTvList();
+      if (selectedTvCode) updatePanel();
+      renderPlTvSelect();
+    }
+  };
+}
+
+function setStatus(ok) {
+  document.getElementById('statusDot').className = 'status-dot' + (ok ? ' ok' : '');
+  document.getElementById('statusText').textContent = ok ? 'Conectado' : 'Reconectando...';
+}
+
+// ==================== TABS ====================
+function switchTab(tab) {
+  document.getElementById('panel-videos').style.display = tab === 'videos' ? 'flex' : 'none';
+  document.getElementById('panel-playlists').style.display = tab === 'playlists' ? 'flex' : 'none';
+  document.getElementById('tab-videos').classList.toggle('active', tab === 'videos');
+  document.getElementById('tab-playlists').classList.toggle('active', tab === 'playlists');
+}
+
+// ==================== VIDEOS ====================
+function loadVideos(btn) {
+  if (btn && btn.tagName === 'BUTTON') { btn.textContent = '...'; btn.disabled = true; }
+  fetch('/videos-list')
+    .then(r => { if (!r.ok) throw new Error('Erro no servidor'); return r.json(); })
+    .then(list => {
+      videos = list;
+      renderVideoGrid();
+      renderBroadcastList();
+      renderPlVideoGrid();
+    })
+    .catch(err => {
+      console.error("Erro ao carregar vídeos:", err);
+      alert("Erro ao carregar lista de vídeos.");
+    })
+    .finally(() => {
+      if (btn && btn.tagName === 'BUTTON') { btn.textContent = '↻ atualizar'; btn.disabled = false; }
+    });
+}
+
+function renderVideoGrid() {
+  const grid = document.getElementById('videoGrid');
+  if (!videos.length) {
+    grid.innerHTML = `<div style="color:var(--muted);font-size:12px;grid-column:1/-1;">
+      Nenhum vídeo encontrado. Coloque arquivos .mp4 ou .webm na pasta <code style="font-family:monospace">videos/</code>.
+    </div>`;
+    return;
+  }
+  grid.innerHTML = videos.map(v => {
+    const isImg = /\.(jpg|jpeg|png|gif|webp)$/i.test(v);
+    const thumbStyle = isImg ? `style="background-image: url('/videos/${encodeURIComponent(v)}');"` : '';
+    return `
+      <div class="video-item ${selectedVideo === v ? 'selected' : ''}" onclick="selectVideo('${v.replace(/'/g,"\\'")}')">
+        <button class="video-delete-btn" onclick="deleteVideo('${v.replace(/'/g,"\\'")}', event)" title="Excluir">🗑</button>
+        <div class="video-thumb" ${thumbStyle}>${isImg ? '' : '🎬'}</div>
+        <div class="video-name">${v}</div>
+      </div>`;
+  }).join('');
+}
+
+function deleteVideo(name, event) {
+  if (event) event.stopPropagation();
+  if (!confirm(`Excluir "${name}"?\n\nEssa ação apaga o arquivo do servidor e não pode ser desfeita.`)) return;
+  fetch('/delete-video?name=' + encodeURIComponent(name), { method: 'DELETE' })
+    .then(r => { if (!r.ok) return r.json().then(d => { throw new Error(d.error || 'Erro ao excluir'); }); return r.json(); })
+    .then(() => {
+      if (selectedVideo === name) selectedVideo = null;
+      if (broadcastVideo === name) broadcastVideo = null;
+      loadVideos();
+    })
+    .catch(err => alert('Erro ao excluir: ' + err.message));
+}
+
+function renderBroadcastList() {
+  const grid = document.getElementById('broadcastVideoList');
+  if (!grid) return;
+  if (!videos.length) {
+    grid.innerHTML = `<div style="color:var(--muted);font-size:12px;grid-column:1/-1;">Nenhum vídeo na pasta videos/</div>`;
+    return;
+  }
+  grid.innerHTML = videos.map(v => `
+    <div class="video-item ${broadcastVideo === v ? 'selected' : ''}" onclick="selectBroadcastVideo('${v.replace(/'/g,"\\'")}')">
+      <div class="video-thumb">🎬</div>
+      <div class="video-name">${v}</div>
+    </div>
+  `).join('');
+}
+
+function selectBroadcastVideo(v) {
+  broadcastVideo = v;
+  renderBroadcastList();
+  document.getElementById('broadcastBtn').disabled = !broadcastVideo;
+}
+
+function selectVideo(v) {
+  selectedVideo = v;
+  if (selectedTvCode) ws.send(JSON.stringify({ type: 'play', code: selectedTvCode, video: v }));
+  renderVideoGrid();
+}
+
+// ==================== TV LIST ====================
+function renderTvList() {
+  const list = document.getElementById('tvList');
+  document.getElementById('tvCount').textContent = tvs.length;
+  if (!tvs.length) {
+    list.innerHTML = `<div class="empty-tvs"><div class="icon">📺</div><p>Nenhuma TV conectada.<br>Abra <strong>tv.html</strong> em cada TV para conectar.</p></div>`;
+    return;
+  }
+  list.innerHTML = tvs.map(tv => {
+    const statusClass = !tv.video ? '' : tv.paused ? 'paused' : 'playing';
+    let statusLabel = !tv.video ? 'Aguardando' : tv.paused ? 'Pausado' : 'Reproduzindo';
+    let extra = '';
+    if (tv.playlist) extra = ' · 📋 ' + tv.playlist.name;
+    else if (tv.video) extra = ' · ' + tv.video;
+    return `
+    <div class="tv-card ${selectedTvCode === tv.code ? 'selected' : ''}" onclick="selectTv('${tv.code}')">
+      <div class="tv-card-top">
+        <div class="tv-icon">📺</div>
+        <div>
+          <div class="tv-name">${tv.name}</div>
+          <div class="tv-code-badge">${tv.code}</div>
+        </div>
+      </div>
+      <div class="tv-status">
+        <div class="dot ${statusClass}"></div>
+        ${statusLabel}${extra}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function selectTv(code) {
+  selectedTvCode = code;
+  selectedVideo = null;
+  document.getElementById('noSelection').style.display = 'none';
+  document.getElementById('tvPanel').style.display = 'flex';
+  renderTvList();
+  updatePanel();
+  renderVideoGrid();
+}
+
+function deselectTv() {
+  selectedTvCode = null;
+  document.getElementById('noSelection').style.display = 'flex';
+  document.getElementById('tvPanel').style.display = 'none';
+  const btn = document.getElementById('btnFullscreen');
+  btn.dataset.fs = '0'; btn.textContent = '⛶ Tela cheia'; btn.disabled = true;
+  renderTvList();
+}
+
+function updatePanel() {
+  const tv = tvs.find(t => t.code === selectedTvCode);
+  if (!tv) return deselectTv();
+  document.getElementById('panelTvName').textContent = tv.name;
+  document.getElementById('panelTvCode').textContent = tv.code;
+
+  const hasVideo = !!(tv.video || tv.playlist);
+  document.getElementById('btnPause').disabled = !hasVideo || tv.paused;
+  document.getElementById('btnResume').disabled = !hasVideo || !tv.paused;
+  document.getElementById('btnStop').disabled = !hasVideo;
+
+  const btn = document.getElementById('btnFullscreen');
+  btn.disabled = false;
+  btn.textContent = tv.fullscreen ? '⊡ Sair tela cheia' : '⛶ Tela cheia';
+  btn.dataset.fs = tv.fullscreen ? '1' : '0';
+
+  const nowBar = document.getElementById('nowPlayingBar');
+  if (hasVideo) {
+    nowBar.style.display = 'flex';
+    if (tv.playlist) {
+      document.getElementById('nowPlayingLabel').textContent = '🔁 Playlist em loop';
+      document.getElementById('nowPlayingName').textContent = tv.playlist.name + ' (' + tv.playlist.videos.length + ' vídeo(s))';
+    } else {
+      document.getElementById('nowPlayingLabel').textContent = 'Reproduzindo agora';
+      document.getElementById('nowPlayingName').textContent = tv.video;
+    }
+  } else {
+    nowBar.style.display = 'none';
+  }
+
+  const statusEl = document.getElementById('panelTvStatus');
+  if (!hasVideo) statusEl.innerHTML = '<span class="tag tag-muted">Aguardando</span>';
+  else if (tv.paused) statusEl.innerHTML = '<span class="tag tag-amber">⏸ Pausado</span>';
+  else statusEl.innerHTML = '<span class="tag tag-green">▶ Reproduzindo</span>';
+}
+
+function pauseTv() { if (selectedTvCode) ws.send(JSON.stringify({ type: 'pause', code: selectedTvCode })); }
+function resumeTv() { if (selectedTvCode) ws.send(JSON.stringify({ type: 'resume', code: selectedTvCode })); }
+function stopTv() { if (selectedTvCode) ws.send(JSON.stringify({ type: 'stop', code: selectedTvCode })); }
+function toggleFullscreen() {
+  if (!selectedTvCode) return;
+  const tv = tvs.find(t => t.code === selectedTvCode);
+  if (!tv) return;
+  const isFs = !!tv.fullscreen;
+  ws.send(JSON.stringify({ type: isFs ? 'exit_fullscreen' : 'enter_fullscreen', code: selectedTvCode }));
+  tv.fullscreen = !isFs;
+  updatePanel();
+}
+function broadcastSelected() {
+  if (broadcastVideo) ws.send(JSON.stringify({ type: 'broadcast', video: broadcastVideo }));
+}
+function broadcastCurrent() {
+  if (selectedVideo) ws.send(JSON.stringify({ type: 'broadcast', video: selectedVideo }));
+  else if (selectedTvCode) {
+    const tv = tvs.find(t => t.code === selectedTvCode);
+    if (tv && tv.video) ws.send(JSON.stringify({ type: 'broadcast', video: tv.video }));
+  }
+}
+
+// ==================== UPLOAD ====================
+const UPLOAD_EXT_REGEX = /\.(mp4|webm|mkv|mov|avi|jpg|jpeg|png|gif|webp)$/i;
+const IMAGE_EXT_REGEX = /\.(jpg|jpeg|png|webp)$/i; // gif fica de fora (perderia animação no canvas)
+const MAX_IMAGE_DIMENSION = 1920; // px, no maior lado
+const IMAGE_JPEG_QUALITY = 0.85;
+
+// Redimensiona/comprime a imagem no navegador antes de enviar, pra evitar
+// que fotos gigantes de celular (vários MB, 4000px+) travem a decodificação na TV.
+function resizeImageIfNeeded(file) {
+  if (!IMAGE_EXT_REGEX.test(file.name)) return Promise.resolve(file); // gif e vídeos passam direto
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const { width, height } = img;
+
+      // Se já é pequena o suficiente, não mexe (evita recomprimir à toa)
+      if (width <= MAX_IMAGE_DIMENSION && height <= MAX_IMAGE_DIMENSION) {
+        resolve(file);
+        return;
+      }
+
+      const scale = MAX_IMAGE_DIMENSION / Math.max(width, height);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(width * scale);
+      canvas.height = Math.round(height * scale);
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      canvas.toBlob((blob) => {
+        if (!blob) { resolve(file); return; } // falhou por algum motivo, manda o original
+        const newName = file.name.replace(/\.(jpe?g|png|webp)$/i, '.jpg');
+        resolve(new File([blob], newName, { type: 'image/jpeg' }));
+      }, 'image/jpeg', IMAGE_JPEG_QUALITY);
+    };
+
+    img.onerror = () => { URL.revokeObjectURL(objectUrl); resolve(file); }; // falhou, manda o original
+    img.src = objectUrl;
+  });
+}
+
+function setupDropzone(zoneId, inputId, listId) {
+  const zone = document.getElementById(zoneId);
+  const input = document.getElementById(inputId);
+  if (!zone || !input) return;
+  zone.addEventListener('click', () => input.click());
+  input.addEventListener('change', () => { handleFiles(input.files, listId); input.value = ''; });
+  ['dragenter', 'dragover'].forEach(evt => zone.addEventListener(evt, (e) => {
+    e.preventDefault(); e.stopPropagation(); zone.classList.add('dragover');
+  }));
+  ['dragleave', 'drop'].forEach(evt => zone.addEventListener(evt, (e) => {
+    e.preventDefault(); e.stopPropagation(); zone.classList.remove('dragover');
+  }));
+  zone.addEventListener('drop', (e) => { handleFiles(e.dataTransfer.files, listId); });
+}
+
+function handleFiles(fileList, listId) {
+  Array.from(fileList || []).forEach(file => {
+    if (!UPLOAD_EXT_REGEX.test(file.name)) {
+      alert(`Formato não suportado: ${file.name}\nUse .mp4, .webm, .mkv, .mov, .avi, .jpg, .png, .gif ou .webp`);
+      return;
+    }
+    resizeImageIfNeeded(file).then(finalFile => uploadFile(finalFile, listId));
+  });
+}
+
+function uploadFile(file, listId) {
+  const list = document.getElementById(listId);
+  if (!list) return;
+  const itemId = 'up-' + Math.random().toString(36).slice(2);
+  const isImg = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
+  const item = document.createElement('div');
+  item.className = 'upload-item'; item.id = itemId;
+  item.innerHTML = `
+    <span>${isImg ? '🖼' : '🎬'}</span>
+    <div class="name">${file.name}</div>
+    <div class="upload-bar-track"><div class="upload-bar-fill" id="${itemId}-bar"></div></div>
+    <div class="upload-pct" id="${itemId}-pct">0%</div>
+  `;
+  list.prepend(item);
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', '/upload-video?name=' + encodeURIComponent(file.name));
+  xhr.upload.onprogress = (e) => {
+    if (!e.lengthComputable) return;
+    const pct = Math.round((e.loaded / e.total) * 100);
+    const bar = document.getElementById(itemId + '-bar');
+    const pctEl = document.getElementById(itemId + '-pct');
+    if (bar) bar.style.width = pct + '%';
+    if (pctEl) pctEl.textContent = pct + '%';
+  };
+  xhr.onload = () => {
+    const el = document.getElementById(itemId);
+    if (!el) return;
+    if (xhr.status === 200) {
+      el.classList.add('done');
+      document.getElementById(itemId + '-pct').textContent = '✓';
+      document.getElementById(itemId + '-bar').style.width = '100%';
+      loadVideos();
+      setTimeout(() => el.remove(), 4000);
+    } else {
+      el.classList.add('error');
+      let msg = 'Falha no upload';
+      try { msg = JSON.parse(xhr.responseText).error || msg; } catch {}
+      document.getElementById(itemId + '-pct').textContent = '✗';
+      el.title = msg;
+    }
+  };
+  xhr.onerror = () => {
+    const el = document.getElementById(itemId);
+    if (!el) return;
+    el.classList.add('error');
+    document.getElementById(itemId + '-pct').textContent = '✗';
+    el.title = 'Erro de conexão durante o upload';
+  };
+  xhr.send(file);
+}
+
+// ==================== PLAYLISTS ====================
+function loadPlaylists() {
+  fetch('/playlists')
+    .then(r => r.json())
+    .then(data => {
+      playlists = data;
+      renderPlList();
+    })
+    .catch(err => console.error("Erro ao carregar playlists:", err));
+}
+
+function renderPlList() {
+  const list = document.getElementById('plList');
+  const count = Object.keys(playlists).length;
+  document.getElementById('plCount').textContent = count;
+  if (!count) {
+    list.innerHTML = `<div class="empty-tvs" style="padding:30px 16px;"><div class="icon">📋</div><p>Nenhuma playlist.<br>Clique em <strong>+ Nova Playlist</strong> para criar.</p></div>`;
+    return;
+  }
+  list.innerHTML = Object.values(playlists).map(pl => `
+    <div class="pl-card ${selectedPlaylistId === pl.id ? 'selected' : ''}" onclick="selectPlaylist('${pl.id}')">
+      <div class="pl-card-icon">📋</div>
+      <div class="pl-card-info">
+        <div class="pl-card-name">${pl.name}</div>
+        <div class="pl-card-count">${pl.videos.length} vídeo(s)</div>
+      </div>
+      <button class="pl-card-del" onclick="event.stopPropagation(); deletePlaylist('${pl.id}')" title="Excluir">×</button>
+    </div>
+  `).join('');
+}
+
+function selectPlaylist(id) {
+  selectedPlaylistId = id;
+  editingPlaylistId = null;
+  renderPlList();
+  showPlView(playlists[id]);
+}
+
+function showPlView(pl) {
+  document.getElementById('plEmptyState').style.display = 'none';
+  document.getElementById('plForm').style.display = 'none';
+  document.getElementById('plView').style.display = 'flex';
+
+  document.getElementById('plViewName').textContent = pl.name;
+  const itemCount = pl.videos.length;
+  document.getElementById('plViewCount').textContent = itemCount + ' item(ns) · loop contínuo';
+
+  const ol = document.getElementById('plViewOrderList');
+  ol.innerHTML = pl.videos.map((item, i) => {
+    let name, duration, isImage;
+    if (typeof item === 'string') {
+      name = item;
+      isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(item);
+      duration = isImage ? 10 : 0;
+    } else {
+      name = item.name;
+      duration = item.duration || 0;
+      isImage = item.isImage || /\.(jpg|jpeg|png|gif|webp)$/i.test(name);
+    }
+    const icon = isImage ? '🖼' : '🎬';
+    const durationText = isImage ? ` • ${duration}s` : '';
+    return `
+    <div class="pl-order-item">
+      <div class="pl-order-num">${i + 1}</div>
+      <div>${icon}</div>
+      <div class="pl-order-name">${name}${durationText}</div>
+    </div>
+  `}).join('');
+
+  renderPlTvSelect();
+}
+
+function renderPlTvSelect() {
+  const sel = document.getElementById('plTvSelect');
+  if (!sel) return;
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">— Selecione uma TV —</option>' +
+    tvs.filter(t => t.connected !== false).map(t =>
+      `<option value="${t.code}" ${prev === t.code ? 'selected' : ''}>${t.name} (${t.code})</option>`
+    ).join('');
+  sel.onchange = () => {
+    document.getElementById('plSendBtn').disabled = !sel.value;
+  };
+  document.getElementById('plSendBtn').disabled = !sel.value;
+}
+
+function sendPlaylistToTv() {
+  const code = document.getElementById('plTvSelect').value;
+  if (!code || !selectedPlaylistId) return;
+  const pl = playlists[selectedPlaylistId];
+  ws.send(JSON.stringify({ type: 'play_playlist', code, playlist: pl }));
+  // Feedback visual
+  const btn = document.getElementById('plSendBtn');
+  btn.textContent = '✓ Enviada!';
+  setTimeout(() => { btn.textContent = '▶ Iniciar Playlist'; }, 2000);
+}
+
+function broadcastPlaylist() {
+  if (!selectedPlaylistId) return;
+  const pl = playlists[selectedPlaylistId];
+  tvs.forEach(tv => {
+    ws.send(JSON.stringify({ type: 'play_playlist', code: tv.code, playlist: pl }));
+  });
+  const btn = document.getElementById('plBroadcastBtn');
+  btn.textContent = '✓ Enviada para todas!';
+  setTimeout(() => { btn.textContent = '📡 Enviar para todas as TVs'; }, 2000);
+}
+
+function deletePlaylist(id) {
+  if (!confirm('Excluir esta playlist?')) return;
+  fetch('/playlists/' + id, { method: 'DELETE' })
+    .then(() => {
+      delete playlists[id];
+      if (selectedPlaylistId === id) {
+        selectedPlaylistId = null;
+        document.getElementById('plEmptyState').style.display = 'flex';
+        document.getElementById('plForm').style.display = 'none';
+        document.getElementById('plView').style.display = 'none';
+      }
+      renderPlList();
+    });
+}
+
+function openNewPlaylist() {
+  selectedPlaylistId = null;
+  editingPlaylistId = null;
+  plSelectedVideos = [];
+  plSelectedDurations = {};
+  renderPlList();
+  showPlForm(null);
+}
+
+function editPlaylist() {
+  if (!selectedPlaylistId) return;
+  editingPlaylistId = selectedPlaylistId;
+  const pl = playlists[selectedPlaylistId];
+  plSelectedVideos = [];
+  plSelectedDurations = {};
+  // Converter formato antigo (array de strings) para novo (array de objetos)
+  if (Array.isArray(pl.videos)) {
+    pl.videos.forEach(item => {
+      if (typeof item === 'string') {
+        plSelectedVideos.push(item);
+        const isImg = /\.(jpg|jpeg|png|gif|webp)$/i.test(item);
+        plSelectedDurations[item] = isImg ? 10 : 0; // 10s para imagens, 0 (duração natural) para vídeos
+      } else if (item.name) {
+        plSelectedVideos.push(item.name);
+        plSelectedDurations[item.name] = item.duration || (item.isImage ? 10 : 0);
+      }
+    });
+  }
+  showPlForm(pl);
+}
+
+function showPlForm(pl) {
+  document.getElementById('plEmptyState').style.display = 'none';
+  document.getElementById('plView').style.display = 'none';
+  document.getElementById('plForm').style.display = 'flex';
+  document.getElementById('plFormTitle').textContent = pl ? 'Editar Playlist' : 'Nova Playlist';
+  document.getElementById('plNameInput').value = pl ? pl.name : '';
+  document.getElementById('plNameError').textContent = '';
+  document.getElementById('plVideosError').textContent = '';
+  renderPlVideoGrid();
+  renderPlOrderList();
+}
+
+function cancelPlaylistEdit() {
+  plSelectedVideos = [];
+  editingPlaylistId = null;
+  document.getElementById('plForm').style.display = 'none';
+  if (selectedPlaylistId && playlists[selectedPlaylistId]) {
+    showPlView(playlists[selectedPlaylistId]);
+  } else {
+    document.getElementById('plEmptyState').style.display = 'flex';
+  }
+}
+
+function renderPlVideoGrid() {
+  const grid = document.getElementById('plVideoGrid');
+  if (!videos.length) {
+    grid.innerHTML = `<div style="color:var(--muted);font-size:12px;grid-column:1/-1;">Nenhum vídeo na pasta videos/</div>`;
+    return;
+  }
+  grid.innerHTML = videos.map(v => {
+    const sel = plSelectedVideos.includes(v);
+    const isImg = /\.(jpg|jpeg|png|gif|webp)$/i.test(v);
+    const thumbStyle = isImg ? `style="background-image: url('/videos/${encodeURIComponent(v)}');"` : '';
+    return `
+      <div class="pl-video-item ${sel ? 'selected' : ''}" onclick="togglePlVideo('${v.replace(/'/g,"\\'")}')">
+        <div class="check">✓</div>
+        <div class="pl-video-thumb" ${thumbStyle}>${isImg ? '' : '🎬'}</div>
+        <div class="pl-video-name">${v}</div>
+      </div>`;
+  }).join('');
+}
+
+function togglePlVideo(v) {
+  const idx = plSelectedVideos.indexOf(v);
+  if (idx === -1) {
+    plSelectedVideos.push(v);
+    // Inicializar duração padrão
+    const isImg = /\.(jpg|jpeg|png|gif|webp)$/i.test(v);
+    plSelectedDurations[v] = isImg ? 10 : 0;
+  } else {
+    plSelectedVideos.splice(idx, 1);
+    delete plSelectedDurations[v];
+  }
+  document.getElementById('plVideosError').textContent = '';
+  renderPlVideoGrid();
+  renderPlOrderList();
+}
+
+function updatePlItemDuration(v, duration) {
+  plSelectedDurations[v] = parseInt(duration) || 10;
+}
+
+function renderPlOrderList() {
+  const ol = document.getElementById('plOrderList');
+  const empty = document.getElementById('plOrderEmpty');
+  const count = plSelectedVideos.length;
+  document.getElementById('plOrderCount').textContent = count + ' item(ns)';
+  if (!count) {
+    ol.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+  ol.innerHTML = plSelectedVideos.map((v, i) => {
+    const isImg = /\.(jpg|jpeg|png|gif|webp)$/i.test(v);
+    const duration = plSelectedDurations[v] || (isImg ? 10 : 0);
+    const icon = isImg ? '🖼' : '🎬';
+    return `
+    <div class="pl-order-item">
+      <div class="pl-order-num">${i + 1}</div>
+      <div>${icon}</div>
+      <div class="pl-order-name">${v}</div>
+      ${isImg ? `<div style="display:flex; align-items:center; gap:6px; font-size:12px;">
+        <label style="color:var(--muted);">Tempo:</label>
+        <input type="number" min="1" max="300" value="${duration}" onchange="updatePlItemDuration('${v.replace(/'/g,"\\'")}'" this.value)" style="width:50px; padding:4px 6px; background:var(--surface2); border:1px solid var(--border); border-radius:4px; color:var(--text); font-size:12px;" title="Tempo em segundos">
+        <span style="color:var(--muted);">s</span>
+      </div>` : ''}
+      <div class="pl-order-btns">
+        <button class="pl-order-btn" onclick="movePlVideo(${i}, -1)" ${i === 0 ? 'disabled' : ''}>▲</button>
+        <button class="pl-order-btn" onclick="movePlVideo(${i}, 1)" ${i === count - 1 ? 'disabled' : ''}>▼</button>
+      </div>
+      <button class="pl-order-del" onclick="removePlVideo(${i})" title="Remover">×</button>
+    </div>
+  `}).join('');
+}
+
+function movePlVideo(idx, dir) {
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= plSelectedVideos.length) return;
+  const tmp = plSelectedVideos[idx];
+  plSelectedVideos[idx] = plSelectedVideos[newIdx];
+  plSelectedVideos[newIdx] = tmp;
+  renderPlOrderList();
+}
+
+function removePlVideo(idx) {
+  const v = plSelectedVideos[idx];
+  delete plSelectedDurations[v];
+  plSelectedVideos.splice(idx, 1);
+  renderPlVideoGrid();
+  renderPlOrderList();
+}
+
+function savePlaylist() {
+  const name = document.getElementById('plNameInput').value.trim();
+  let valid = true;
+
+  if (!name) {
+    document.getElementById('plNameError').textContent = 'O nome da playlist é obrigatório.';
+    document.getElementById('plNameInput').classList.add('error');
+    valid = false;
+  } else {
+    document.getElementById('plNameError').textContent = '';
+    document.getElementById('plNameInput').classList.remove('error');
+  }
+
+  if (plSelectedVideos.length === 0) {
+    document.getElementById('plVideosError').textContent = 'Adicione ao menos 1 item à playlist.';
+    valid = false;
+  } else {
+    document.getElementById('plVideosError').textContent = '';
+  }
+
+  if (!valid) return;
+
+  const videos = plSelectedVideos.map(v => ({
+    name: v,
+    duration: plSelectedDurations[v] || 0,
+    isImage: /\.(jpg|jpeg|png|gif|webp)$/i.test(v)
+  }));
+
+  const payload = {
+    id: editingPlaylistId || undefined,
+    name,
+    videos: videos,
+  };
+
+  fetch('/playlists', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+    .then(r => r.json())
+    .then(saved => {
+      if (saved.error) { alert(saved.error); return; }
+      playlists[saved.id] = saved;
+      selectedPlaylistId = saved.id;
+      editingPlaylistId = null;
+      plSelectedVideos = [];
+      renderPlList();
+      showPlView(saved);
+    })
+    .catch(err => alert("Erro ao salvar playlist: " + err));
+}
+
+// ==================== INIT ====================
+connect();
+setupDropzone('dropzone-broadcast', 'fileInput-broadcast', 'uploadList-broadcast');
+setupDropzone('dropzone-panel', 'fileInput-panel', 'uploadList-panel');
+</script>
+</body>
+</html>
