@@ -1,0 +1,12 @@
+{
+  "name": "visionloop",
+  "version": "0.0.6",
+  "description": "Controle de vídeos em loop para TVs via rede local",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.21.0"
+  }
+}
