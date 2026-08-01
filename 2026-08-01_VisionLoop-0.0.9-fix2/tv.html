@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VisionLoop — TV</title>
+<link rel="icon" href="/assets/icon.png" type="image/png">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #000; color: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    height: 100vh; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  #videoContainer { width: 100%; height: 100%; position: relative; display: none; }
+
+  video, #imageDisplay {
+    width: 100%; height: 100%; object-fit: contain; background: #000;
+    position: absolute; top: 0; left: 0;
+    transition: opacity 0.8s ease-in-out;
+  }
+
+  #imageDisplay {
+    display: none;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    opacity: 0;
+  }
+
+  video { opacity: 0; }
+  video.visible, #imageDisplay.visible { opacity: 1; }
+
+  #overlay {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.6); opacity: 0; transition: opacity 0.5s; pointer-events: none;
+    z-index: 10;
+  }
+  #overlay.show { opacity: 1; }
+  #overlayIcon { font-size: 72px; }
+  #overlayText { font-size: 20px; margin-top: 16px; color: rgba(255,255,255,0.7); }
+
+  #plBadge {
+    position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%);
+    background: rgba(108,99,255,0.85); color: #fff;
+    border-radius: 24px; padding: 8px 20px;
+    font-size: 14px; font-weight: 600; letter-spacing: 0.2px;
+    display: none; gap: 8px; align-items: center;
+    backdrop-filter: blur(8px);
+    white-space: nowrap; max-width: 90vw; overflow: hidden; text-overflow: ellipsis;
+    z-index: 20;
+  }
+  #plBadge.show { display: flex; }
+
+  #standby {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 28px; text-align: center; padding: 40px;
+  }
+
+  .logo-big { width: 200px; margin: 0 auto; display: block; }
+  .code-box {
+    background: #111; border: 2px solid #222; border-radius: 16px; padding: 24px 40px;
+  }
+  .code-label { font-size: 13px; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+  .code-value {
+    font-size: 52px; font-family: 'SF Mono', 'Fira Code', monospace;
+    font-weight: 700; letter-spacing: 8px; color: #6c63ff; min-height: 60px;
+  }
+
+  .name-input-wrap { display: flex; gap: 10px; align-items: center; }
+
+  input[type="text"] {
+    background: #111; border: 1px solid #333; border-radius: 8px;
+    color: #fff; font-size: 15px; padding: 10px 14px; outline: none;
+    width: 220px; transition: border-color 0.2s;
+  }
+  input[type="text"]:focus { border-color: #6c63ff; }
+
+  button {
+    background: #6c63ff; color: #fff; border: none; border-radius: 8px;
+    padding: 10px 18px; font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity 0.15s;
+  }
+  button:hover { opacity: 0.85; }
+
+  .pair-info {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    font-size: 13px; color: #666;
+  }
+  .pair-info strong { color: #a89fff; font-family: 'SF Mono', 'Fira Code', monospace; letter-spacing: 2px; }
+  .pair-status { font-size: 12px; color: #555; }
+  .pair-status.off { color: #f59e0b; }
+  .pair-status.on { color: #22c55e; }
+  .pair-change-btn {
+    background: transparent; color: #777; border: 1px solid #333; border-radius: 8px;
+    padding: 8px 18px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .pair-change-btn:hover { color: #fff; border-color: #6c63ff; }
+
+  .compat-toggle {
+    display: flex; align-items: flex-start; gap: 10px; cursor: pointer;
+    max-width: 460px; text-align: left; font-size: 12px; color: #555; line-height: 1.5;
+  }
+  .compat-toggle input { width: 18px; height: 18px; flex-shrink: 0; margin-top: 1px; accent-color: #6c63ff; }
+  .compat-toggle.on { color: #a89fff; }
+
+  .conn-status { font-size: 12px; color: #444; display: flex; align-items: center; gap: 6px; }
+  .conn-dot { width: 8px; height: 8px; border-radius: 50%; background: #333; transition: background 0.3s; }
+  .conn-dot.ok { background: #22c55e; }
+  .conn-dot.error { background: #ef4444; }
+
+  .ip-screen {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 32px; text-align: center; padding: 40px;
+  }
+  .ip-title { font-size: 22px; font-weight: 600; color: #fff; }
+  .ip-subtitle { font-size: 14px; color: #555; }
+  .ip-single {
+    background: #111; border: 2px solid #333; border-radius: 12px;
+    color: #fff; font-size: 32px; font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;
+    font-weight: 700; width: 320px; text-align: center; padding: 16px 12px; outline: none;
+    letter-spacing: 2px; transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .ip-single:focus { border-color: #6c63ff; box-shadow: 0 0 0 3px rgba(108,99,255,0.15); }
+  .ip-single.filled { border-color: #6c63ff; color: #a89fff; }
+  .ip-hint { font-size: 13px; color: #444; }
+  .ip-hint strong { color: #666; }
+  .ip-connect-btn {
+    background: #6c63ff; color: #fff; border: none; border-radius: 12px;
+    padding: 14px 48px; font-size: 16px; font-weight: 700; cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s; letter-spacing: 0.5px;
+  }
+  .ip-connect-btn:hover { opacity: 0.85; }
+  .ip-connect-btn:active { transform: scale(0.97); }
+  .ip-connect-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .ip-error { font-size: 13px; color: #ef4444; min-height: 18px; }
+
+  #fsOverlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+    z-index: 9999; align-items: center; justify-content: center;
+    flex-direction: column; gap: 24px;
+  }
+  #fsOverlay.show { display: flex; }
+  #fsBtn {
+    background: #6c63ff; color: #fff; border: none; border-radius: 16px;
+    padding: 22px 64px; font-size: 22px; font-weight: 700; cursor: pointer;
+    box-shadow: 0 0 0 4px rgba(108,99,255,0.4); transition: opacity 0.15s, transform 0.1s;
+  }
+  #fsBtn:hover, #fsBtn:focus { opacity: 0.88; outline: 3px solid #fff; transform: scale(1.03); }
+  #fsLabel { font-size: 15px; color: #666; }
+</style>
+</head>
+<body>
+
+<div id="fsOverlay">
+  <button id="fsBtn" onclick="confirmFullscreen()">⛶ Entrar em tela cheia</button>
+  <div id="fsLabel">Pressione OK no controle remoto para confirmar</div>
+</div>
+
+<!-- TELA 1: Digitar o código do controlador -->
+<div id="codeScreen" class="ip-screen">
+  <img class="logo-big" src="/assets/logo.png" alt="VisionLoop" onerror="this.style.display='none'">
+  <div>
+    <div class="ip-title">Digite o código do controlador</div>
+    <div class="ip-subtitle">Veja o código de 5 dígitos na tela do controlador</div>
+  </div>
+  <input class="ip-single" type="text" id="pairCodeInput" placeholder="00000" maxlength="5" autocomplete="off" inputmode="numeric">
+  <div class="ip-error" id="codeError"></div>
+  <button class="ip-connect-btn" id="codeConnectBtn" onclick="connectWithCode()" disabled>Conectar</button>
+  <label class="compat-toggle" id="compatLabelCode">
+    <input type="checkbox" id="compatModeCode" onchange="setCompatMode(this.checked)">
+    <span>Modo compatibilidade — carrega um vídeo por vez. Marque se esta TV travar,
+    piscar ou ficar com a tela preta na troca de vídeos.</span>
+  </label>
+</div>
+
+<!-- TELA 2: Aguardando / em reprodução -->
+<div id="standby" style="display:none; flex-direction:column; align-items:center; gap:28px; text-align:center; padding:40px;">
+  <div><img class="logo-big" src="/assets/logo.png" alt="VisionLoop"></div>
+  <div class="code-box">
+    <div class="code-label">Código desta TV</div>
+    <div class="code-value" id="codeDisplay">
+      <span class="pulse" style="font-size:24px; letter-spacing:2px; color:#444;">aguardando...</span>
+    </div>
+  </div>
+  <!-- Mostra a qual controlador esta TV está presa e permite trocar. Sem esta
+       saída, uma TV com código antigo salvo ficava sem nenhuma forma de ser
+       repareada. -->
+  <div class="pair-info">
+    <div>Pareada com o controlador <strong id="pairedCode">—</strong></div>
+    <div id="ctrlStatus" class="pair-status">verificando…</div>
+    <button class="pair-change-btn" onclick="forgetPairing()">Trocar código</button>
+  </div>
+  <div class="name-input-wrap">
+    <input type="text" id="tvNameInput" placeholder="Nome desta TV (ex: Sala, Loja...)" maxlength="30">
+    <button onclick="setName()">Salvar</button>
+  </div>
+  <label class="compat-toggle" id="compatLabel">
+    <input type="checkbox" id="compatMode" onchange="setCompatMode(this.checked)">
+    <span>Modo compatibilidade — carrega um vídeo por vez. Marque se esta TV travar,
+    piscar ou ficar com a tela preta na troca de vídeos.</span>
+  </label>
+  <div class="conn-status">
+    <div class="conn-dot" id="connDot"></div>
+    <span id="connText">Conectando ao servidor...</span>
+  </div>
+</div>
+
+<div id="videoContainer">
+  <!-- Dois elementos de vídeo se revezam: enquanto um toca, o outro já pode
+       estar recebendo o próximo vídeo da playlist em segundo plano (preload real). -->
+  <video id="playerA" playsinline preload="auto"></video>
+  <video id="playerB" playsinline preload="auto"></video>
+  <div id="imageDisplay"></div>
+  <div id="overlay">
+    <div id="overlayIcon">⏸</div>
+    <div id="overlayText">Pausado</div>
+  </div>
+  <div id="plBadge">🔁 <span id="plBadgeText"></span></div>
+</div>
+
+<script>
+let ws;
+let reconnectTimer;
+let imageTimer = null;
+let preloadTimer = null;
+const IMAGE_DURATION = 10000; // 10 segundos para cada imagem na playlist
+
+// Quanto tempo ANTES do fim do item atual o próximo começa a ser preparado.
+// Ver comentário do double buffer abaixo para o porquê de não ser no início.
+const PRELOAD_LEAD_MS = 8000;
+
+// Playlist state
+let currentPlaylist = null;
+let playlistIndex = 0;
+let playlistMode = false;
+let preloadArmed = false; // garante um preload por item
+const preloadedImageUrls = new Set(); // evita rebaixar a mesma imagem repetidamente
+
+// ---------- Persistência local ----------
+// A TV precisa voltar sozinha ao ar depois de um reload (inclusive o reload
+// automático de emergência) sem ninguém ir até ela digitar o código de novo.
+const LS = {
+  code: 'vl_pairCode',
+  name: 'vl_tvName',
+  state: 'vl_lastState',
+  compat: 'vl_compatMode',
+};
+function lsGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
+function lsSet(k, v) { try { localStorage.setItem(k, v); } catch {} }
+function lsDel(k) { try { localStorage.removeItem(k); } catch {} }
+
+// ---------- Double buffer de vídeo ----------
+// Dois elementos <video> se revezam entre "ativo" (visível, tocando) e "em
+// espera" (fora de tela, recebendo o PRÓXIMO vídeo da playlist com
+// antecedência). Isso é um preload de verdade: o navegador baixa E decodifica
+// os primeiros frames antes da hora de tocar, então a troca no fim de um
+// vídeo é instantânea, sem tela preta / re-buffering.
+//
+// PORÉM: muitas Smart TVs de entrada têm UM ÚNICO decodificador H.264 por
+// hardware. Dois <video> com src carregado ao mesmo tempo podem disputar esse
+// recurso — e o resultado é justamente o congelamento que o preload queria
+// evitar. Por isso duas salvaguardas:
+//   1) O preload é TARDIO: o próximo item só é carregado ~8s antes do fim do
+//      atual (PRELOAD_LEAD_MS), e não no início dele. Assim a janela em que
+//      dois decodificadores são disputados é de segundos, não do vídeo todo.
+//   2) O player que sai de cena é LIBERADO na hora (releasePlayer), devolvendo
+//      decodificador e memória em vez de segurá-los até a próxima troca.
+// Para TVs que ainda assim engasguem, existe o "modo compatibilidade", que
+// desliga o double buffer e usa um único elemento de vídeo.
+let players = null; // preenchido no fim do arquivo, quando o DOM já existe
+let activeIdx = 0;
+function activePlayer() { return players[activeIdx]; }
+function idlePlayer() { return players[1 - activeIdx]; }
+function clearWatchdog(el) {
+  if (el._watchdog) { clearInterval(el._watchdog); el._watchdog = null; }
+}
+
+// A caixinha do modo compatibilidade aparece nas duas telas (pareamento e
+// espera), para ser alcançável tanto numa TV nova quanto numa já configurada.
+// O estado real fica nesta variável; as caixinhas são só o reflexo dela.
+let compatMode = false;
+
+function doubleBufferEnabled() {
+  return !compatMode;
+}
+
+function setCompatMode(on) {
+  compatMode = !!on;
+  lsSet(LS.compat, compatMode ? '1' : '0');
+  [['compatMode', 'compatLabel'], ['compatModeCode', 'compatLabelCode']].forEach(([box, label]) => {
+    const b = document.getElementById(box);
+    const l = document.getElementById(label);
+    if (b) b.checked = compatMode;
+    if (l) l.classList.toggle('on', compatMode);
+  });
+  if (compatMode && players) {
+    // Devolve imediatamente o decodificador do player que estava só em espera.
+    const idle = idlePlayer();
+    if (idle && idle !== activePlayer()) releasePlayer(idle);
+  }
+}
+
+// Devolve decodificador de vídeo e memória de buffer ao sistema. Só remover a
+// classe de visibilidade não basta: enquanto o elemento tiver um src carregado,
+// a TV continua com o decodificador preso a ele.
+function releasePlayer(el) {
+  if (!el) return;
+  clearWatchdog(el);
+  el.onended = null; el.onerror = null; el.oncanplay = null; el.ontimeupdate = null;
+  try { el.pause(); } catch {}
+  el.removeAttribute('src');
+  try { el.load(); } catch {}
+  el._loadedName = null;
+  el.classList.remove('visible');
+}
+
+// ---------- Recuperação de emergência ----------
+// Última linha de defesa: se a TV travar repetidamente em pouco tempo, é
+// porque o estado do player/navegador ficou inconsistente e nenhuma tentativa
+// pontual vai resolver. Recarregar a página inteira devolve tudo ao zero — e,
+// como o código de pareamento e o que estava tocando ficam salvos localmente,
+// a TV volta ao ar sozinha em poucos segundos, sem ninguém ir até ela.
+const MAX_RECOVERIES = 3;
+const RECOVERY_WINDOW_MS = 120000;
+let recoveryCount = 0;
+let lastRecoveryAt = 0;
+let healthyTimer = null;
+
+function registerRecovery() {
+  const now = Date.now();
+  if (now - lastRecoveryAt > RECOVERY_WINDOW_MS) recoveryCount = 0;
+  lastRecoveryAt = now;
+  recoveryCount++;
+  if (recoveryCount >= MAX_RECOVERIES) {
+    console.warn('Falhas repetidas — recarregando a página para recuperar.');
+    showOverlay('🔄', 'Reiniciando player…');
+    setTimeout(() => location.reload(), 1500);
+    return true;
+  }
+  return false;
+}
+
+// ---------- Código de pareamento ----------
+const codeInput = document.getElementById('pairCodeInput');
+const codeConnectBtn = document.getElementById('codeConnectBtn');
+let pairCode = null;
+
+codeInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') connectWithCode();
+});
+
+codeInput.addEventListener('input', () => {
+  const cleaned = codeInput.value.replace(/[^0-9]/g, '').slice(0, 5);
+  if (codeInput.value !== cleaned) codeInput.value = cleaned;
+  codeInput.classList.toggle('filled', cleaned.length > 0);
+  document.getElementById('codeError').textContent = '';
+  codeConnectBtn.disabled = cleaned.length !== 5;
+});
+
+function connectWithCode() {
+  const value = codeInput.value.trim();
+  if (value.length !== 5) {
+    document.getElementById('codeError').textContent = 'Digite os 5 dígitos do código.';
+    return;
+  }
+  pairCode = value;
+  lsSet(LS.code, value); // permite reconectar sozinha depois de um reload
+  setPairedInfo(value);
+  document.getElementById('codeScreen').style.display = 'none';
+  document.getElementById('standby').style.display = 'flex';
+  connect();
+}
+
+codeInput.focus();
+
+// ---------- WebSocket ----------
+function connect() {
+  // Conecta sempre ao mesmo host que serviu esta página — a TV não precisa
+  // saber nenhum IP, basta abrir a URL do site.
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(`${protocol}//${location.host}`);
+
+  ws.onopen = () => {
+    setConn(true);
+    ws.send(JSON.stringify({ type: 'tv_connect', name: tvName(), roomCode: pairCode }));
+  };
+
+  ws.onclose = () => {
+    setConn(false);
+    document.getElementById('codeDisplay').innerHTML =
+      '<span class="pulse" style="font-size:24px;letter-spacing:2px;color:#444;">reconectando...</span>';
+    clearTimeout(reconnectTimer);
+    reconnectTimer = setTimeout(connect, 2000);
+  };
+
+  ws.onerror = (err) => console.error('WebSocket Error:', err);
+
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === 'your_code') document.getElementById('codeDisplay').textContent = msg.code;
+    if (msg.type === 'controller_status') setControllerStatus(!!msg.online);
+    if (msg.type === 'play') {
+      playlistMode = false; currentPlaylist = null;
+      saveLastState({ t: 'v', v: msg.video });
+      playMedia(msg.video); hidePlBadge();
+    }
+    if (msg.type === 'play_playlist') {
+      saveLastState({ t: 'p', p: msg.playlist });
+      startPlaylist(msg.playlist);
+    }
+    if (msg.type === 'pause') { pauseMedia(); showOverlay('⏸', 'Pausado'); }
+    if (msg.type === 'resume') { resumeMedia(); hideOverlay(); }
+    if (msg.type === 'stop') { lsDel(LS.state); stopMedia(); hidePlBadge(); playlistMode = false; currentPlaylist = null; }
+    if (msg.type === 'enter_fullscreen') enterFullscreen();
+    if (msg.type === 'exit_fullscreen') exitFullscreen();
+  };
+}
+
+function tvName() { return document.getElementById('tvNameInput').value.trim() || 'TV'; }
+
+function setName() {
+  if (ws && ws.readyState === 1) {
+    lsSet(LS.name, tvName());
+    ws.send(JSON.stringify({ type: 'tv_set_name', name: tvName() }));
+    showOverlay('✅', tvName());
+    setTimeout(hideOverlay, 1500);
+  }
+}
+
+// Guarda o que está tocando para a TV retomar sozinha após um reload.
+function saveLastState(state) {
+  try { lsSet(LS.state, JSON.stringify(state)); } catch {}
+}
+
+// Mostra a qual controlador esta TV está presa e se ele está no ar.
+function setPairedInfo(code) {
+  const el = document.getElementById('pairedCode');
+  if (el) el.textContent = code || '—';
+}
+function setControllerStatus(online) {
+  const el = document.getElementById('ctrlStatus');
+  if (!el) return;
+  el.className = 'pair-status ' + (online ? 'on' : 'off');
+  el.textContent = online
+    ? 'Controlador conectado'
+    : 'Nenhum controlador com este código no ar — confira o código na tela do controlador.';
+}
+
+// Esquece o pareamento e volta para a tela de digitar o código. É a saída para
+// quando o controlador passou a usar outro código: sem isto a TV ficava presa
+// a um código morto, sem nenhuma forma de ser repareada.
+function forgetPairing() {
+  lsDel(LS.code);
+  lsDel(LS.state);
+  pairCode = null;
+  clearTimeout(reconnectTimer);
+  stopMedia();
+  if (ws) { try { ws.onclose = null; ws.close(); } catch {} }
+  document.getElementById('standby').style.display = 'none';
+  document.getElementById('codeScreen').style.display = 'flex';
+  const input = document.getElementById('pairCodeInput');
+  input.value = '';
+  input.classList.remove('filled');
+  document.getElementById('codeConnectBtn').disabled = true;
+  document.getElementById('codeError').textContent = '';
+  input.focus();
+}
+
+// ---------- Playback ----------
+function isImage(filename) {
+  return /\.(jpg|jpeg|png|webp)$/i.test(filename);
+}
+function itemName(item) { return typeof item === 'string' ? item : item.name; }
+function itemDuration(item) { return typeof item === 'object' ? (item.duration || 0) : 0; }
+
+// Observa se o vídeo realmente está avançando. Em algumas Smart TVs o
+// decodificador pode travar (buffer/hardware) sem nunca disparar um evento
+// "error" — o currentTime simplesmente para de avançar para sempre e a tela
+// fica congelada. Esse watchdog detecta isso e força uma recuperação.
+function armWatchdog(el, onStuck) {
+  clearWatchdog(el);
+  let lastTime = -1;
+  let stuckChecks = 0;
+  el._watchdog = setInterval(() => {
+    if (el.paused || el.ended || el !== activePlayer()) return;
+    if (el.currentTime === lastTime) {
+      stuckChecks++;
+      if (stuckChecks === 1) {
+        // primeira detecção: tenta retomar sozinho (comum após um stall de rede)
+        el.play().catch(() => {});
+      } else if (stuckChecks >= 3) { // ~6s parado mesmo após tentar retomar
+        stuckChecks = 0;
+        onStuck();
+      }
+    } else {
+      stuckChecks = 0;
+      lastTime = el.currentTime;
+    }
+  }, 2000);
+}
+
+function handleStuckPlayback() {
+  console.warn('Vídeo travado detectado pelo watchdog — recuperando.');
+  if (registerRecovery()) return; // travou demais: a página vai recarregar
+  showOverlay('⚠️', 'Recuperando reprodução…');
+  if (playlistMode) {
+    setTimeout(() => { hideOverlay(); nextPlaylistItem(); }, 800);
+  } else {
+    const el = activePlayer();
+    setTimeout(() => {
+      hideOverlay();
+      el.load();
+      el.play().catch(() => {});
+    }, 800);
+  }
+}
+
+function playMedia(item, duration) {
+  clearTimeout(imageTimer);
+  clearTimeout(preloadTimer);
+  preloadArmed = false;
+  const filename = itemName(item);
+  const dur = duration || itemDuration(item);
+
+  document.getElementById('standby').style.display = 'none';
+  document.getElementById('videoContainer').style.display = 'block';
+  hideOverlay();
+
+  if (isImage(filename)) {
+    playImageItem(filename, dur);
+  } else {
+    playVideoItem(filename);
+  }
+  // O preload do próximo item NÃO acontece aqui. Ele é agendado para perto do
+  // fim deste item (ver playImageItem e o ontimeupdate em playVideoItem), para
+  // não manter dois vídeos carregados durante toda a reprodução.
+}
+
+function playImageItem(filename, duration) {
+  const imgDisplay = document.getElementById('imageDisplay');
+  // Enquanto uma imagem está na tela nenhum vídeo precisa de decodificador:
+  // liberamos os dois players e devolvemos esse recurso à TV.
+  players.forEach(releasePlayer);
+  imgDisplay.classList.remove('visible');
+
+  const url = `/videos/${encodeURIComponent(filename)}`;
+  setTimeout(() => {
+    players.forEach(p => p.style.display = 'none');
+    imgDisplay.style.display = 'block';
+    imgDisplay.style.backgroundImage = `url('${url}')`;
+    // Força um reflow para a transição de opacidade funcionar
+    imgDisplay.offsetHeight;
+    imgDisplay.classList.add('visible');
+  }, 100);
+
+  if (playlistMode) {
+    const displayDuration = duration > 0 ? duration * 1000 : IMAGE_DURATION;
+    imageTimer = setTimeout(() => nextPlaylistItem(), displayDuration);
+    // Prepara o próximo item só no finalzinho do tempo da imagem.
+    const preloadAt = Math.max(0, displayDuration - PRELOAD_LEAD_MS);
+    preloadTimer = setTimeout(() => { preloadArmed = true; preloadNextInPlaylist(); }, preloadAt);
+  }
+}
+
+// Toca um vídeo. Se ele já tiver sido pré-carregado no elemento "em espera"
+// (ver preloadNextInPlaylist), a troca é instantânea — só alternamos qual
+// elemento é o "ativo", sem precisar baixar/decodificar nada na hora.
+function playVideoItem(filename) {
+  const imgDisplay = document.getElementById('imageDisplay');
+  imgDisplay.classList.remove('visible');
+  imgDisplay.style.display = 'none';
+
+  players.forEach(clearWatchdog);
+
+  let el;
+  const idle = idlePlayer();
+  if (doubleBufferEnabled() && idle._loadedName === filename) {
+    // O próximo já estava pré-carregado: só troca quem é o ativo.
+    el = idle;
+    activeIdx = 1 - activeIdx;
+  } else {
+    el = activePlayer();
+    if (el._loadedName !== filename) {
+      const url = `/videos/${encodeURIComponent(filename)}`;
+      el.src = url;
+      el.load();
+      el._loadedName = filename;
+    }
+  }
+
+  // Libera o outro elemento imediatamente. A partir daqui só UM vídeo segura
+  // decodificador — o segundo volta a existir apenas na janela de preload,
+  // pouco antes da próxima troca.
+  players.forEach(p => { if (p !== el) releasePlayer(p); });
+
+  players.forEach(p => {
+    p.style.display = 'block';
+    if (p !== el) p.classList.remove('visible');
+  });
+  el.loop = !playlistMode;
+
+  // Se o vídeo já estava pré-carregado, o evento "canplay" já disparou no
+  // passado e não vai disparar de novo — nesse caso mostramos direto.
+  if (el.readyState >= 3) {
+    el.classList.add('visible');
+    el.oncanplay = null;
+  } else {
+    el.oncanplay = () => { el.classList.add('visible'); el.oncanplay = null; };
+  }
+
+  // Tratamento de erro de codec/rede/decodificação.
+  el.onerror = () => {
+    const err = el.error;
+    console.error('Erro no player de vídeo:', err, filename);
+    let label = 'Erro ao reproduzir vídeo';
+    if (err) {
+      if (err.code === 4) label = 'Formato incompatível';
+      else if (err.code === 3) label = 'Falha ao decodificar vídeo';
+      else if (err.code === 2) label = 'Falha de rede';
+      else label = 'Reprodução abortada';
+    }
+    // Erro de formato (código 4) é problema DO ARQUIVO: recarregar a página
+    // não resolveria e ainda criaria um ciclo de reloads. Só falhas de
+    // decodificação/rede contam para a recuperação de emergência.
+    if (err && err.code !== 4) {
+      if (registerRecovery()) return;
+    }
+    showOverlay('⚠️', label);
+    // Em qualquer erro, se estiver em playlist, pula para o próximo após um
+    // instante em vez de travar o loop para sempre.
+    if (playlistMode) {
+      setTimeout(() => { if (el.error) nextPlaylistItem(); }, 2500);
+    }
+  };
+
+  el.onended = () => {
+    if (!playlistMode || !currentPlaylist) return;
+    nextPlaylistItem();
+  };
+
+  // Prepara o PRÓXIMO item só quando faltar PRELOAD_LEAD_MS para o fim deste.
+  // Se a duração for desconhecida, nada é pré-carregado e o próximo item é
+  // carregado na hora — mais lento, porém sempre seguro.
+  el.ontimeupdate = () => {
+    if (!playlistMode || preloadArmed) return;
+    const d = el.duration;
+    if (!isFinite(d) || d <= 0) return;
+    if ((d - el.currentTime) * 1000 <= PRELOAD_LEAD_MS) {
+      preloadArmed = true;
+      preloadNextInPlaylist();
+    }
+  };
+
+  // Reproduziu bem por um tempo? Então o problema anterior foi pontual —
+  // zera o contador para que um único arquivo ruim no meio de uma playlist
+  // saudável nunca acumule até disparar o reload de emergência.
+  el.onplaying = () => {
+    clearTimeout(healthyTimer);
+    healthyTimer = setTimeout(() => { recoveryCount = 0; }, 10000);
+  };
+
+  armWatchdog(el, handleStuckPlayback);
+
+  el.play().catch(e => {
+    // Detecção de Autoplay Bloqueado: navegadores modernos exigem interação
+    // do usuário antes de permitir som/vídeo automático.
+    console.warn('Play failed:', e);
+    if (e.name === 'NotAllowedError') {
+      console.warn('Autoplay bloqueado pelo navegador. Mostrando prompt de interação.');
+      showOverlay('▶️', 'Clique para Iniciar');
+      const startOnInteraction = () => {
+        el.play().then(() => {
+          hideOverlay();
+          window.removeEventListener('click', startOnInteraction);
+          window.removeEventListener('keydown', startOnInteraction);
+        }).catch(err => console.error('Ainda não pôde reproduzir:', err));
+      };
+      window.addEventListener('click', startOnInteraction);
+      window.addEventListener('keydown', startOnInteraction);
+    } else if (e.name === 'NotSupportedError') {
+      showOverlay('⚠️', 'Codec não suportado');
+    }
+  });
+}
+
+function pauseMedia() {
+  const el = activePlayer();
+  if (el.style.display !== 'none') el.pause();
+  clearTimeout(imageTimer);
+}
+
+function resumeMedia() {
+  const el = activePlayer();
+  if (el.style.display !== 'none' && el.getAttribute('src') !== null) {
+    el.play().catch(() => {});
+  } else if (playlistMode && currentPlaylist) {
+    // Se for imagem na playlist, reinicia o timer com duração configurada
+    const item = currentPlaylist.videos[playlistIndex];
+    const duration = itemDuration(item) || 10;
+    const displayDuration = duration > 0 ? duration * 1000 : IMAGE_DURATION;
+    imageTimer = setTimeout(() => nextPlaylistItem(), displayDuration);
+  }
+}
+
+function stopMedia() {
+  clearTimeout(imageTimer);
+  clearTimeout(preloadTimer);
+  clearTimeout(healthyTimer);
+  preloadArmed = false;
+  players.forEach(p => {
+    releasePlayer(p);
+    p.onplaying = null;
+    p.style.display = 'none';
+  });
+  const imgDisplay = document.getElementById('imageDisplay');
+  imgDisplay.style.backgroundImage = 'none';
+  imgDisplay.classList.remove('visible');
+  document.getElementById('videoContainer').style.display = 'none';
+  document.getElementById('standby').style.display = 'flex';
+}
+
+// ---------- Playlist loop ----------
+function preloadImageUrl(filename) {
+  const url = `/videos/${encodeURIComponent(filename)}`;
+  if (preloadedImageUrls.has(url)) return;
+  preloadedImageUrls.add(url);
+  // Baixa a imagem em segundo plano; o Cache-Control do servidor faz o
+  // navegador reaproveitar esses bytes na hora de exibir de verdade.
+  const img = new Image();
+  img.src = url;
+}
+
+// Prepara de verdade o PRÓXIMO vídeo da playlist: carrega no elemento
+// <video> que está em segundo plano (fora de tela), para que ele já esteja
+// baixado e decodificado quando chegar a vez dele. Isso é um preload real —
+// diferente de <link rel="prefetch">, que várias TVs ignoram e que, mesmo
+// quando funciona, só ajuda o cache HTTP, não o pipeline de vídeo em si.
+function preloadNextInPlaylist() {
+  if (!currentPlaylist || !currentPlaylist.videos.length) return;
+  const nextIndex = (playlistIndex + 1) % currentPlaylist.videos.length;
+  // Playlist de um item só: o "próximo" é o próprio atual, que já está
+  // carregado. Pré-carregar de novo seria baixar e decodificar à toa.
+  if (nextIndex === playlistIndex) return;
+
+  const nextItem = currentPlaylist.videos[nextIndex];
+  const filename = itemName(nextItem);
+
+  if (isImage(filename)) {
+    preloadImageUrl(filename);
+    return;
+  }
+
+  // Modo compatibilidade: nunca deixa dois vídeos carregados ao mesmo tempo.
+  if (!doubleBufferEnabled()) return;
+
+  const idle = idlePlayer();
+  if (idle._loadedName === filename) return; // já preparado
+  const url = `/videos/${encodeURIComponent(filename)}`;
+  idle.onerror = null; idle.oncanplay = null; idle.onended = null; idle.ontimeupdate = null;
+  clearWatchdog(idle);
+  idle.src = url;
+  idle.load();
+  idle._loadedName = filename;
+}
+
+function startPlaylist(playlist) {
+  currentPlaylist = playlist;
+  playlistIndex = 0;
+  playlistMode = true;
+  preloadedImageUrls.clear();
+  players.forEach(p => { p._loadedName = null; });
+  playCurrentInPlaylist();
+}
+
+function playCurrentInPlaylist() {
+  if (!currentPlaylist || !currentPlaylist.videos.length) return;
+  const item = currentPlaylist.videos[playlistIndex];
+  playMedia(item);
+}
+
+function nextPlaylistItem() {
+  if (!playlistMode || !currentPlaylist) return;
+  playlistIndex = (playlistIndex + 1) % currentPlaylist.videos.length;
+  playCurrentInPlaylist();
+}
+
+// ---------- UI Helpers ----------
+function showPlBadge(name, current, total, videoName) {
+  // Badge desativada a pedido do usuário
+}
+
+function hidePlBadge() {
+  document.getElementById('plBadge').classList.remove('show');
+}
+
+function showOverlay(icon, text) {
+  document.getElementById('overlayIcon').textContent = icon;
+  document.getElementById('overlayText').textContent = text;
+  document.getElementById('overlay').classList.add('show');
+}
+function hideOverlay() { document.getElementById('overlay').classList.remove('show'); }
+
+function enterFullscreen() {
+  const overlay = document.getElementById('fsOverlay');
+  overlay.classList.add('show');
+  document.getElementById('fsBtn').focus();
+}
+function confirmFullscreen() {
+  document.getElementById('fsOverlay').classList.remove('show');
+  const el = document.documentElement;
+  if (el.requestFullscreen) el.requestFullscreen();
+  else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+}
+function exitFullscreen() {
+  document.getElementById('fsOverlay').classList.remove('show');
+  if (document.exitFullscreen) document.exitFullscreen();
+}
+
+function setConn(ok) {
+  document.getElementById('connDot').className = 'conn-dot' + (ok ? ' ok' : ' error');
+  document.getElementById('connText').textContent = ok ? 'Conectado ao servidor' : 'Sem conexão — reconectando...';
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    const el = activePlayer();
+    if (el && el.style.display !== 'none' && el.getAttribute('src') && el.paused && !document.getElementById('overlay').classList.contains('show')) {
+      el.play().catch(() => {});
+    }
+  }
+});
+
+// Inicializa o double buffer agora que os elementos <video> já existem no DOM.
+players = [document.getElementById('playerA'), document.getElementById('playerB')];
+players.forEach(p => { p._loadedName = null; p._watchdog = null; });
+
+// ---------- Restauração ao abrir a página ----------
+// Faz a TV voltar ao ar sozinha: reaplica o modo compatibilidade, o nome, o
+// código de pareamento e o conteúdo que estava tocando. É o que torna o
+// reload de emergência (e uma queda de energia) inofensivos — ninguém precisa
+// ir até a TV digitar o código de novo.
+(function restoreSession() {
+  // 1) Modo compatibilidade. O parâmetro ?compat=1 na URL força o modo mesmo
+  //    numa TV que nunca foi configurada — útil para deixar fixo no atalho.
+  const forcedByUrl = /[?&]compat=1/.test(location.search);
+  setCompatMode(forcedByUrl || lsGet(LS.compat) === '1');
+
+  // 2) Nome da TV
+  const savedName = lsGet(LS.name);
+  if (savedName) document.getElementById('tvNameInput').value = savedName;
+
+  // 3) Código de pareamento — pula a tela de digitação e já conecta
+  const savedCode = lsGet(LS.code);
+  if (!savedCode || !/^\d{5}$/.test(savedCode)) return;
+  pairCode = savedCode;
+  setPairedInfo(savedCode);
+  document.getElementById('codeScreen').style.display = 'none';
+  document.getElementById('standby').style.display = 'flex';
+  connect();
+
+  // 4) Conteúdo que estava no ar. Retomamos sem esperar o controlador; se ele
+  //    mandar algo diferente em seguida, aquilo simplesmente substitui isto.
+  const raw = lsGet(LS.state);
+  if (!raw) return;
+  try {
+    const state = JSON.parse(raw);
+    if (state.t === 'p' && state.p && Array.isArray(state.p.videos) && state.p.videos.length) {
+      startPlaylist(state.p);
+    } else if (state.t === 'v' && state.v) {
+      playlistMode = false; currentPlaylist = null;
+      playMedia(state.v);
+    }
+  } catch {
+    lsDel(LS.state);
+  }
+})();
+</script>
+</body>
+</html>
