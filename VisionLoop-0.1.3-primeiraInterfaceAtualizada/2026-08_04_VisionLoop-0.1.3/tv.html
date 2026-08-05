@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VisionLoop — TV</title>
+<link rel="icon" href="/assets/LogoSemFundo.png
+" type="image/png">
+<link rel="stylesheet" href="/css/tv.css">
+</head>
+<body>
+
+<div id="fsOverlay">
+  <button id="fsBtn" onclick="confirmFullscreen()">⛶ Entrar em tela cheia</button>
+  <div id="fsLabel">Pressione OK no controle remoto para confirmar</div>
+</div>
+
+
+<!-- TELA: Aguardando / em reprodução. Conexão direta — não existe mais tela
+     de digitar código, a TV já conecta sozinha assim que a página abre. -->
+<div id="standby" style="display:flex; flex-direction:column; align-items:center; gap:28px; text-align:center; padding:40px;">
+  <div><img class="logo-big" src="/assets/LogoSemFundo.png" alt="VisionLoop"></div>
+  <div class="code-box">
+    <div class="code-label">Código desta TV</div>
+    <div class="code-value" id="codeDisplay">
+      <span class="pulse" style="font-size:24px; letter-spacing:2px; color:#392069;">aguardando...</span>
+    </div>
+  </div>
+  <div class="pair-info">
+    <div id="ctrlStatus" class="pair-status">verificando…</div>
+  </div>
+  <div class="name-input-wrap">
+    <input type="text" id="tvNameInput" placeholder="Nome desta TV (ex: Sala, Loja...)" maxlength="30">
+    <button onclick="setName()">Salvar</button>
+  </div>
+  <label class="compat-toggle" id="compatLabel">
+    <input type="checkbox" id="compatMode" onchange="setCompatMode(this.checked)">
+    <span>Modo compatibilidade — carrega um vídeo por vez. Marque se esta TV travar,
+    piscar ou ficar com a tela preta na troca de vídeos.</span>
+  </label>
+  <div class="conn-status">
+    <div class="conn-dot" id="connDot"></div>
+    <span id="connText">Conectando ao servidor...</span>
+  </div>
+  <div id="tvVersion" style="font-size:11px; color:#333;"></div>
+</div>
+
+<div id="videoContainer">
+  <!-- Dois elementos de vídeo se revezam: enquanto um toca, o outro já pode
+       estar recebendo o próximo vídeo da playlist em segundo plano (preload real). -->
+  <video id="playerA" playsinline preload="auto"></video>
+  <video id="playerB" playsinline preload="auto"></video>
+  <div id="imageDisplay"></div>
+  <div id="overlay">
+    <div id="overlayIcon">⏸</div>
+    <div id="overlayText">Pausado</div>
+  </div>
+  <div id="plBadge">🔁 <span id="plBadgeText"></span></div>
+</div>
+
+<script src="/js/tv.js"></script>
+</body>
+</html>

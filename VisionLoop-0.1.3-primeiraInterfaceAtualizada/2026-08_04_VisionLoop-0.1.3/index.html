@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VisionLoop</title>
+<link rel="icon" href="assets/LogoSemFundo.png" type="image/png">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: linear-gradient(135deg, #d9f2fb 0%, #e6effb 45%, #ece3fb 75%, #e4d9fb 100%);
+    color: #1a1a1a;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    height: 100vh; overflow: hidden;
+  }
+
+  /* ---------- Theme toggle ---------- */
+  #themeToggle {
+    position: fixed; top: 24px; right: 24px; z-index: 10;
+    width: 44px; height: 44px; border-radius: 50%;
+    background: #ffffff; border: 1px solid rgba(0,0,0,0.06);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; box-shadow: 0 2px 10px rgba(60,50,120,0.08);
+    color: #444;
+  }
+  #themeToggle svg { width: 20px; height: 20px; }
+  #iconSun { display: none; color: #f59e0b; }
+
+  /* ---------- Launcher ---------- */
+  #launcher {
+    height: 100vh; overflow-y: auto;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 36px; text-align: center; padding: 40px;
+  }
+
+  .logo-big { width: 110px; display: block; margin: 0 auto; }
+  .logo-fallback {
+    font-size: 26px; font-weight: 700; letter-spacing: -0.5px; color: #1a1a1a;
+  }
+  .logo-fallback span { color: #6c63ff; }
+
+  .title { font-size: 44px; font-weight: 700; letter-spacing: -1px; color: #1c336b; line-height: 1.1; margin-top: 18px; }
+  .title span {
+    background: linear-gradient(135deg, #38bdf8, #8b5cf6);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+
+  .subtitle { color: #5b5b66; font-size: 16px; margin-top: 14px; line-height: 1.5; max-width: 380px; }
+
+  .choice-row {
+    display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; margin-top: 8px;
+  }
+
+  .choice-card {
+    background: #ffffff; border: 1px solid rgba(0,0,0,0.05);
+    border-radius: 20px; padding: 32px;
+    display: flex; flex-direction: column; align-items: flex-start; gap: 12px;
+    cursor: pointer; width: 260px; text-align: left;
+    box-shadow: 0 6px 20px rgba(60,50,120,0.07);
+    transition: box-shadow 0.15s, transform 0.15s;
+  }
+  .choice-card:hover {
+    box-shadow: 0 12px 28px rgba(108,99,255,0.18);
+    transform: translateY(-3px);
+  }
+  .choice-card:active { transform: scale(0.98); }
+
+  .choice-icon {
+    width: 56px; height: 56px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #38bdf8, #8b5cf6);
+  }
+  .choice-icon svg { width: 26px; height: 26px; color: #fff; }
+
+  .choice-title { font-size: 22px; font-weight: 700; color: #1a1a1a; margin-top: 4px; }
+  .choice-desc  { font-size: 14.5px; color: #6b6b76; line-height: 1.55; }
+
+  .choice-link {
+    font-size: 14.5px; font-weight: 600; margin-top: 6px; color: #4f6bff;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .choice-link svg { width: 15px; height: 15px; transition: transform 0.15s; }
+  .choice-card:hover .choice-link svg { transform: translateX(3px); }
+
+  /* ---------- App view ---------- */
+  #appView {
+    display: none;
+    height: 100vh; width: 100vw; position: relative;
+  }
+  #appView.show { display: block; }
+
+  #appFrame {
+    width: 100%; height: 100%; border: none; display: block; background: #000;
+  }
+
+  #backBtn {
+    position: fixed; top: 14px; left: 14px; z-index: 99999;
+    background: rgba(20,20,20,0.85); color: #ccc; border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 600;
+    cursor: pointer; backdrop-filter: blur(6px);
+    display: flex; align-items: center; gap: 6px;
+    opacity: 0.55; transition: opacity 0.15s;
+  }
+  #backBtn:hover { opacity: 1; }
+
+  #appThemeToggle {
+    position: fixed; top: 64px; right: 14px; z-index: 99999;
+    width: 36px; height: 36px; border-radius: 50%;
+    background: rgba(20,20,20,0.85); color: #ccc; border: none;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; backdrop-filter: blur(6px);
+  }
+  #appThemeToggle svg { width: 16px; height: 16px; }
+  #appIconSun { display: none; }
+
+  /* ---------- Dark mode ---------- */
+  body.dark {
+    background: linear-gradient(135deg, #0f1220 0%, #14172a 50%, #191233 100%);
+    color: #f1f1f5;
+  }
+  body.dark .choice-card { background: #1a1a1a; border-color: rgba(255,255,255,0.08); box-shadow: none; }
+  body.dark .choice-card:hover { box-shadow: 0 12px 28px rgba(108,99,255,0.12); }
+  body.dark .choice-title { color: #f1f1f5; }
+  body.dark .choice-desc { color: #9a9aa8; }
+  body.dark .subtitle { color: #9a9aa8; }
+  body.dark .title { color: #f1f1f5; }
+  body.dark .logo-fallback { color: #f1f1f5; }
+  body.dark #themeToggle { background: #1c1f33; color: #f1f1f5; border-color: rgba(255,255,255,0.08); }
+</style>
+</head>
+<body>
+
+<!-- Botao de tema (Sun/Moon) -->
+<button id="themeToggle" onclick="toggleTheme()" aria-label="Alternar tema">
+  <svg id="iconMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>
+  <svg id="iconSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>
+</button>
+
+<!-- TELA INICIAL: escolher para onde entrar -->
+<div id="launcher">
+  <div>
+    <img class="logo-big" src="/assets/LogoSemFundo.png" alt="VisionLoop" onerror="this.style.display='none'; document.getElementById('logoFallback').style.display='block';">
+    <div id="logoFallback" class="logo-fallback" style="display:none;">Vision<span>Loop</span></div>
+    <h1 class="title">Vision<span>Loop</span></h1>
+    <div class="subtitle">Um loop contínuo entre quem comanda<br>e quem exibe. Escolha o seu lado.</div>
+  </div>
+
+  <div class="choice-row">
+    <div class="choice-card" onclick="openApp('controller')">
+      <div class="choice-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 12H3"></path><path d="M16 6H3"></path><path d="M12 18H3"></path>
+          <path d="m16 12 5 3-5 3v-6Z"></path>
+        </svg>
+      </div>
+      <div class="choice-title">Playlist</div>
+      <div class="choice-desc">Monte, organize e envie sequências de vídeos para as TVs em tempo real.</div>
+      <div class="choice-link">
+        Entrar como Playlist
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12h14M12 5l7 7-7 7"></path>
+        </svg>
+      </div>
+    </div>
+
+    <div class="choice-card" onclick="openApp('tv')">
+      <div class="choice-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect width="18" height="18" x="3" y="3" rx="4"></rect>
+          <path d="m9 8 6 4-6 4V8Z"></path>
+        </svg>
+      </div>
+      <div class="choice-title">TV</div>
+      <div class="choice-desc">Exiba o conteúdo recebido da playlist em tela cheia e em loop.</div>
+      <div class="choice-link">
+        Entrar como TV
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12h14M12 5l7 7-7 7"></path>
+        </svg>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TELA DO APP ESCOLHIDO -->
+<div id="appView">
+  <button id="backBtn" onclick="closeApp()">&larr; Voltar</button>
+  <button id="appThemeToggle" onclick="toggleTheme()" aria-label="Alternar tema">
+    <svg id="appIconMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>
+    <svg id="appIconSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>
+  </button>
+  <!-- Apenas "allowfullscreen": usar os dois atributos juntos gera o aviso
+       "Allow attribute will take precedence over 'allowfullscreen'" no console.
+       O atributo legado funciona nos navegadores modernos e também nos
+       navegadores antigos de Smart TV, que não entendem o atributo "allow". -->
+  <iframe id="appFrame" allowfullscreen></iframe>
+</div>
+
+<script>
+function openApp(key) {
+  // Navega o iframe para o arquivo real no servidor (nao mais base64/srcdoc),
+  // assim WebSocket e fetch() dentro do app resolvem para o host correto.
+  // Nota: o arquivo real do controlador se chama "controller.html" no projeto,
+  // mesmo o card na tela inicial mostrando "Playlist".
+  document.getElementById('appFrame').src = key === 'tv' ? '/tv.html' : '/controller.html';
+  document.getElementById('launcher').style.display = 'none';
+  document.getElementById('themeToggle').style.display = 'none';
+  document.getElementById('appView').classList.add('show');
+}
+
+function closeApp() {
+  document.getElementById('appView').classList.remove('show');
+  document.getElementById('appFrame').src = 'about:blank';
+  document.getElementById('launcher').style.display = 'flex';
+  document.getElementById('themeToggle').style.display = 'flex';
+}
+
+function toggleTheme() {
+  const isDark = document.body.classList.toggle('dark');
+  document.getElementById('iconMoon').style.display = isDark ? 'none' : 'block';
+  document.getElementById('iconSun').style.display = isDark ? 'block' : 'none';
+  document.getElementById('appIconMoon').style.display = isDark ? 'none' : 'block';
+  document.getElementById('appIconSun').style.display = isDark ? 'block' : 'none';
+  localStorage.setItem('vl_theme', isDark ? 'dark' : 'light');
+}
+
+// Lembra o tema escolhido entre visitas
+(function restoreTheme() {
+  if (localStorage.getItem('vl_theme') === 'dark') {
+    document.body.classList.add('dark');
+    document.getElementById('iconMoon').style.display = 'none';
+    document.getElementById('iconSun').style.display = 'block';
+    document.getElementById('appIconMoon').style.display = 'none';
+    document.getElementById('appIconSun').style.display = 'block';
+  }
+})();
+</script>
+</body>
+</html>
